@@ -10,7 +10,7 @@ Validates user input before pipeline execution:
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
 
-from .audio_utils import validate_audio_file, format_duration, format_size
+from ..utils.audio_utils import validate_audio_file, format_duration, format_size
 
 
 def validate_mp3_file(file_path: Path) -> Dict[str, Any]:

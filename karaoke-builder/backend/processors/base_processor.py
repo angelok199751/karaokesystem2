@@ -9,11 +9,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 
-import sys
-from pathlib import Path as P
-sys.path.insert(0, str(P(__file__).parent.parent))
-
-from stage_runner import StageResult
+from ..stage_runner import StageResult
 
 
 @dataclass

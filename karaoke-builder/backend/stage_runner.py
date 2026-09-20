@@ -18,14 +18,8 @@ from typing import Dict, Any, List, Optional, Union
 from dataclasses import dataclass, asdict
 from datetime import datetime
 
-# Fix imports when run directly
-if __name__ != "__main__":
-    try:
-        from .debug_logger import debug_logger
-    except ImportError:
-        from backend.debug_logger import debug_logger
-
-from backend.config import TEMP_DIR
+from .debug_logger import debug_logger
+from .config import TEMP_DIR
 
 
 @dataclass

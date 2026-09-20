@@ -160,7 +160,7 @@ def check_system_readiness() -> Dict[str, Any]:
     Returns:
         Readiness status dict
     """
-    from .system_info import check_libraries
+    from ..utils.system_info import check_libraries
     
     result = {
         "ready": False,

@@ -58,8 +58,16 @@ def api_system_info():
 @app.route('/api/system/readiness', methods=['GET'])
 def api_system_readiness():
     """Check system readiness for pipeline"""
-    readiness = check_system_readiness()
-    return jsonify(readiness)
+    try:
+        readiness = check_system_readiness()
+        return jsonify(readiness)
+    except Exception as e:
+        # Return JSON error, not HTML
+        return jsonify({
+            "ready": False,
+            "error": str(e),
+            "components": {}
+        }), 200  # Return 200 so frontend can parse JSON
 
 
 @app.route('/api/validate', methods=['POST'])
@@ -103,18 +111,61 @@ def api_validate():
 def api_pipeline_start():
     """Start full pipeline"""
     try:
-        data = request.json
+        # Handle file upload via multipart/form-data
+        mp3_file = request.files.get('mp3')
+        txt_file = request.files.get('txt')
+        title = request.form.get('title', '')
         
-        mp3_path = Path(data['mp3_path'])
-        txt_path = Path(data['txt_path'])
-        title = data.get('title', mp3_path.stem)
+        if not mp3_file or not txt_file:
+            return jsonify({
+                "success": False,
+                "error": "MP3 and TXT files are required. Use multipart/form-data upload."
+            }), 400
         
-        # Create job directory
+        # Create job directory FIRST
         job_id = f"job-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
         job_dir = TEMP_DIR / job_id
         job_dir.mkdir(parents=True, exist_ok=True)
         
-        # Initialize context
+        # Save uploaded files to job directory
+        mp3_path = job_dir / "input.mp3"
+        txt_path = job_dir / "lyrics.txt"
+        
+        mp3_file.save(str(mp3_path))
+        txt_file.save(str(txt_path))
+        
+        # Verify files were saved correctly
+        if not mp3_path.exists() or not mp3_path.is_file():
+            return jsonify({
+                "success": False,
+                "error": f"Failed to save MP3 file. Path: {mp3_path}"
+            }), 500
+        
+        if not txt_path.exists() or not txt_path.is_file():
+            return jsonify({
+                "success": False,
+                "error": f"Failed to save TXT file. Path: {txt_path}"
+            }), 500
+        
+        # Get absolute paths
+        mp3_path = mp3_path.resolve()
+        txt_path = txt_path.resolve()
+        
+        debug_logger.start_job(job_id)
+        debug_logger.log_info("PIPELINE", f"Job started: {job_id}")
+        debug_logger.log_info("PIPELINE", f"Job directory: {job_dir.resolve()}")
+        debug_logger.log_info("PIPELINE", f"Uploaded MP3 saved: {mp3_path}")
+        debug_logger.log_info("PIPELINE", f"Uploaded TXT saved: {txt_path}")
+        
+        # Use title from form or generate from filename
+        if not title or not title.strip():
+            title = mp3_path.stem
+        
+        debug_logger.log_info("PIPELINE", f"Starting pipeline for: {title}")
+        debug_logger.log_info("PIPELINE", f"MP3: {mp3_path}")
+        debug_logger.log_info("PIPELINE", f"TXT: {txt_path}")
+        
+        # Initialize context with SAVED file paths
         context = ProcessorContext(
             job_id=job_id,
             work_dir=job_dir,
@@ -123,50 +174,60 @@ def api_pipeline_start():
             title=title
         )
         
-        # Start logging
-        debug_logger.start_job(job_id)
-        debug_logger.log_info("PIPELINE", f"Starting pipeline for: {title}")
-        debug_logger.log_info("PIPELINE", f"MP3: {mp3_path}")
-        debug_logger.log_info("PIPELINE", f"TXT: {txt_path}")
-        
-        # Store job info in session (for retry functionality)
-        # In production, use proper session management
-        app.config['current_job'] = {
+        # Store job info in app config (for retry functionality)
+        active_jobs[job_id] = {
             'id': job_id,
             'dir': str(job_dir),
             'context': context
         }
+        app.config['current_job'] = active_jobs[job_id]
         
         # Run pipeline stages sequentially
         results = {}
         
         # Stage 1: Demucs
+        debug_logger.log_info("PIPELINE", "Starting Stage 1: Demucs")
         demucs = DemucsProcessor(context)
         results['demucs'] = demucs.execute().to_dict()
         
         if not results['demucs']['success']:
-            return _pipeline_failed(results, job_dir)
+            debug_logger.log_error("PIPELINE", f"Demucs failed: {results['demucs'].get('stderr', 'Unknown error')}")
+            return _pipeline_failed(results, job_dir, 'demucs')
+        
+        debug_logger.log_info("PIPELINE", "Demucs completed successfully")
         
         # Stage 2: WhisperX
+        debug_logger.log_info("PIPELINE", "Starting Stage 2: WhisperX")
         whisperx = WhisperXProcessor(context)
         results['whisperx'] = whisperx.execute().to_dict()
         
         if not results['whisperx']['success']:
-            return _pipeline_failed(results, job_dir)
+            debug_logger.log_error("PIPELINE", f"WhisperX failed: {results['whisperx'].get('stderr', 'Unknown error')}")
+            return _pipeline_failed(results, job_dir, 'whisperx')
+        
+        debug_logger.log_info("PIPELINE", "WhisperX completed successfully")
         
         # Stage 3: Pitch
+        debug_logger.log_info("PIPELINE", "Starting Stage 3: Pitch")
         pitch = PitchProcessor(context)
         results['pitch'] = pitch.execute().to_dict()
         
         if not results['pitch']['success']:
-            return _pipeline_failed(results, job_dir)
+            debug_logger.log_error("PIPELINE", f"Pitch failed: {results['pitch'].get('stderr', 'Unknown error')}")
+            return _pipeline_failed(results, job_dir, 'pitch')
+        
+        debug_logger.log_info("PIPELINE", "Pitch completed successfully")
         
         # Stage 4: Packaging
+        debug_logger.log_info("PIPELINE", "Starting Stage 4: Packaging")
         packaging = PackagingProcessor(context)
         results['packaging'] = packaging.execute().to_dict()
         
         if not results['packaging']['success']:
-            return _pipeline_failed(results, job_dir)
+            debug_logger.log_error("PIPELINE", f"Packaging failed: {results['packaging'].get('stderr', 'Unknown error')}")
+            return _pipeline_failed(results, job_dir, 'packaging')
+        
+        debug_logger.log_info("PIPELINE", "Packaging completed successfully")
         
         # Success!
         debug_logger.end_job(True)
@@ -201,19 +262,12 @@ def api_pipeline_start():
         }), 500
 
 
-def _pipeline_failed(results, job_dir):
+def _pipeline_failed(results, job_dir, failed_stage):
     """Handle pipeline failure with detailed stage information"""
     debug_logger.end_job(False)
     
-    # Find the failed stage
-    failed_stage = None
-    failed_result = None
-    
-    for stage_name, result in results.items():
-        if not result.get('success', False):
-            failed_stage = stage_name
-            failed_result = result
-            break
+    # Find the failed stage result
+    failed_result = results.get(failed_stage, {})
     
     # Build detailed error response
     error_response = {

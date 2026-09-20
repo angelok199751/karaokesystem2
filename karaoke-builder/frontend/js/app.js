@@ -217,12 +217,12 @@ class KaraokeBuilderApp {
         });
         
         try {
-            // Start pipeline
+            // Start pipeline with file upload
             this.setStageStatus('validation', 'processing', 'Validating...');
             
             const result = await window.api.startPipeline(
-                this.mp3File.path || `/tmp/${this.mp3File.name}`,
-                this.txtFile.path || `/tmp/${this.txtFile.name}`,
+                this.mp3File,
+                this.txtFile,
                 title
             );
             

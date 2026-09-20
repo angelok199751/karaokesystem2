@@ -43,13 +43,44 @@ class ApiClient {
     }
     
     /**
-     * POST request
+     * POST request with JSON
      */
     async post(endpoint, data) {
         return this.request(endpoint, {
             method: 'POST',
             body: JSON.stringify(data)
         });
+    }
+    
+    /**
+     * POST request with multipart/form-data (file upload)
+     */
+    async uploadFiles(endpoint, mp3File, txtFile, title = '') {
+        const formData = new FormData();
+        formData.append('mp3', mp3File);
+        formData.append('txt', txtFile);
+        formData.append('title', title);
+        
+        const url = `${API_BASE}${endpoint}`;
+        
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                body: formData
+                // Don't set Content-Type header - browser will set it with boundary
+            });
+            
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(data.error || data.error_message || `HTTP ${response.status}`);
+            }
+            
+            return data;
+        } catch (error) {
+            console.error('Upload Error:', error);
+            throw error;
+        }
     }
     
     // System endpoints
@@ -71,12 +102,8 @@ class ApiClient {
     }
     
     // Pipeline
-    async startPipeline(mp3Path, txtPath, title) {
-        return this.post('/api/pipeline/start', {
-            mp3_path: mp3Path,
-            txt_path: txtPath,
-            title: title
-        });
+    async startPipeline(mp3File, txtFile, title) {
+        return this.uploadFiles('/api/pipeline/start', mp3File, txtFile, title);
     }
     
     async runStage(stageName) {

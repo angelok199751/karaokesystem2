@@ -6,6 +6,7 @@ Uses torchcrepe to extract continuous pitch contour from vocals
 """
 
 import json
+import sys
 from pathlib import Path
 from typing import List, Dict, Any
 
@@ -64,7 +65,8 @@ class PitchProcessor(BaseProcessor):
             f.write(script_content)
         
         # Build command
-        command = ["python", str(script_file)]
+        # Using sys.executable to ensure we use the same Python environment
+        command = [sys.executable, str(script_file)]
         
         debug_logger.log_info(self.name, f"Using model: {PITCH_MODEL}")
         debug_logger.log_info(self.name, f"Sample rate: {SAMPLE_RATE} Hz")

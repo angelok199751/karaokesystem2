@@ -6,6 +6,7 @@ Separates vocals from instrumental using Demucs
 """
 
 import os
+import sys
 from pathlib import Path
 from typing import List
 
@@ -56,9 +57,9 @@ class DemucsProcessor(BaseProcessor):
         instrumental_file = model_dir / "instrumental.wav"
         
         # Build command
-        # Using python -m demucs to ensure we use the installed version
+        # Using sys.executable to ensure we use the same Python environment
         command = [
-            "python", "-m", "demucs",
+            sys.executable, "-m", "demucs",
             "-n", DEMUCS_MODEL,
             "-o", str(demucs_dir.absolute()),
             str(self.context.input_file.absolute())

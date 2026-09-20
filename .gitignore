@@ -5,20 +5,9 @@ __pycache__/
 *.pyo
 *.pyd
 
-# Logs and temp files
+# Test output directories
+karaoke-builder/test_output/
+
+# Logs
 *.log
-*.tmp
-
-# Environment
-.env
-.env.local
-*.env.*
-
-# Editors
-.vscode/
-.idea/
-
-# Dependencies
-.venv/
-venv/
 ```

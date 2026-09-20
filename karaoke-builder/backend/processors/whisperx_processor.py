@@ -6,6 +6,7 @@ Uses WhisperX with forced alignment to get word timestamps
 """
 
 import json
+import os
 import sys
 from pathlib import Path
 from typing import List, Dict, Any
@@ -91,6 +92,25 @@ class WhisperXProcessor(BaseProcessor):
         # Using sys.executable to ensure we use the same Python environment
         command = [sys.executable, str(script_file)]
         
+        # Get FFmpeg path and add to PATH for child process
+        from ..utils.ffmpeg_helper import get_ffmpeg_path
+        ffmpeg_path = get_ffmpeg_path()
+        
+        if ffmpeg_path:
+            ffmpeg_dir = str(ffmpeg_path.parent)
+            debug_logger.log_info(self.name, f"WhisperX: FFmpeg path: {ffmpeg_path}")
+            debug_logger.log_info(self.name, f"WhisperX: FFmpeg exists: {ffmpeg_path.exists()}")
+            
+            # Add FFmpeg directory to PATH for child process
+            process_env = os.environ.copy()
+            if 'PATH' in process_env:
+                process_env['PATH'] = f"{ffmpeg_dir}{os.pathsep}{process_env['PATH']}"
+            else:
+                process_env['PATH'] = ffmpeg_dir
+        else:
+            debug_logger.log_warning(self.name, "FFmpeg not found in bundled location, using system PATH")
+            process_env = None
+        
         debug_logger.log_info(self.name, f"Using model: {WHISPER_MODEL}")
         debug_logger.log_info(self.name, f"Output: {words_file.name}")
         
@@ -101,6 +121,7 @@ class WhisperXProcessor(BaseProcessor):
             command=command,
             input_files=[self.context.vocals_file],
             output_files=[words_file],
+            env=process_env,
             timeout=WHISPERX_TIMEOUT,
         )
         

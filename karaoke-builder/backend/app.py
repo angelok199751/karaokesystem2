@@ -17,19 +17,16 @@ from pathlib import Path
 from datetime import datetime
 from flask import Flask, request, jsonify, send_from_directory, send_file
 
-# Add backend to path
-sys.path.insert(0, str(Path(__file__).parent))
-
-from config import HOST, PORT, DEBUG, TEMP_DIR, FRONTEND_DIR, KEEP_TEMP_ON_SUCCESS
-from debug_logger import debug_logger
-from stage_runner import StageRunner
-from processors.base_processor import ProcessorContext
-from processors.demucs_processor import DemucsProcessor
-from processors.whisperx_processor import WhisperXProcessor
-from processors.pitch_processor import PitchProcessor
-from processors.packaging_processor import PackagingProcessor
-from models.validation import validate_project_inputs, check_system_readiness
-from utils.system_info import get_system_info, print_diagnostics
+from .config import HOST, PORT, DEBUG, TEMP_DIR, FRONTEND_DIR, KEEP_TEMP_ON_SUCCESS
+from .debug_logger import debug_logger
+from .stage_runner import StageRunner
+from .processors.base_processor import ProcessorContext
+from .processors.demucs_processor import DemucsProcessor
+from .processors.whisperx_processor import WhisperXProcessor
+from .processors.pitch_processor import PitchProcessor
+from .processors.packaging_processor import PackagingProcessor
+from .models.validation import validate_project_inputs, check_system_readiness
+from .utils.system_info import get_system_info, print_diagnostics
 
 
 app = Flask(__name__, 

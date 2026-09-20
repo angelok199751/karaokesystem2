@@ -1,0 +1,22 @@
+# Core dependencies
+flask==3.0.0
+flask-cors==4.0.0
+
+# Audio processing
+demucs>=4.0.0
+torch>=2.0.0
+torchaudio>=2.0.0
+
+# Pitch analysis
+torchcrepe>=0.0.20
+
+# WhisperX will be installed separately due to complex dependencies
+# whisperx @ git+https://github.com/m-bain/whisperx.git
+
+# Utilities
+numpy>=1.24.0
+scipy>=1.10.0
+librosa>=0.10.0
+
+# System
+psutil>=5.9.0

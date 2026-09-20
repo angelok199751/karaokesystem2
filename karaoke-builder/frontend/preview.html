@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Karaoke Preview — Karaoke Builder</title>
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/preview.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎤 Karaoke Preview</h1>
+            <p class="subtitle">Technical Prototype — Preview Mode</p>
+        </header>
+
+        <!-- Player Section -->
+        <section id="player-section" class="card">
+            <div class="lyrics-display">
+                <div id="previous-line" class="lyric-line previous"></div>
+                <div id="current-line" class="lyric-line current"></div>
+                <div id="next-line" class="lyric-line next"></div>
+            </div>
+
+            <div class="player-controls">
+                <button id="btn-play" class="btn btn-primary">▶ Play</button>
+                <button id="btn-stop" class="btn btn-secondary">■ Stop</button>
+                
+                <div class="progress-container">
+                    <span id="current-time">00:00</span>
+                    <input type="range" id="progress-bar" min="0" max="100" value="0">
+                    <span id="total-duration">00:00</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Timeline -->
+        <section id="timeline-section" class="card">
+            <h2>Timeline</h2>
+            <div id="timeline-container" class="timeline-container">
+                <!-- Timeline will be rendered here -->
+            </div>
+        </section>
+
+        <!-- Debug Info -->
+        <section id="debug-info" class="card">
+            <h2>Debug Information</h2>
+            <div id="debug-content">
+                <p>Loading...</p>
+            </div>
+        </section>
+    </div>
+
+    <audio id="audio-player" preload="auto"></audio>
+    
+    <script src="js/api.js"></script>
+    <script src="js/preview.js"></script>
+</body>
+</html>

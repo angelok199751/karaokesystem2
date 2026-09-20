@@ -34,6 +34,10 @@ app = Flask(__name__,
             static_url_path='')
 
 
+# In-memory registry for active jobs
+active_jobs = {}
+
+
 # Serve frontend
 @app.route('/')
 def serve_index():

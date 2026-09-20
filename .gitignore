@@ -1,12 +1,9 @@
 ```
-# Dependencies
-node_modules/
+# Compiled Python files
+*.pyc
+__pycache__/
 
-# Editors
-.vscode/
-
-# Environment
-.env
-.env.local
-*.env.*
+# Logs
+logs/
+*.log
 ```

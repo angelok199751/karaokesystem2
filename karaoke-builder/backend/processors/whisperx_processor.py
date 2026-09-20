@@ -182,7 +182,11 @@ def main():
         
         # Load Whisper model
         print(f"Loading Whisper model: {{MODEL_NAME}}")
-        model = whisperx.load_whisper(MODEL_NAME, device=device, compute_type=compute_type)
+        model = whisperx.load_model(
+            whisper_arch=MODEL_NAME,
+            device=device,
+            compute_type=compute_type
+        )
         
         # Transcribe
         print("Transcribing...")

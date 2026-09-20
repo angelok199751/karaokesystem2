@@ -202,16 +202,39 @@ def api_pipeline_start():
 
 
 def _pipeline_failed(results, job_dir):
-    """Handle pipeline failure"""
+    """Handle pipeline failure with detailed stage information"""
     debug_logger.end_job(False)
     
-    return jsonify({
+    # Find the failed stage
+    failed_stage = None
+    failed_result = None
+    
+    for stage_name, result in results.items():
+        if not result.get('success', False):
+            failed_stage = stage_name
+            failed_result = result
+            break
+    
+    # Build detailed error response
+    error_response = {
         "success": False,
         "job_id": job_dir.name,
-        "results": results,
-        "error": "Pipeline failed at one or more stages",
-        "temp_dir": str(job_dir)
-    }), 400
+        "stage": failed_stage,  # Specific stage that failed
+        "error": f"Pipeline failed at stage: {failed_stage}",
+        "temp_dir": str(job_dir),
+        "results": results
+    }
+    
+    # Add detailed error info from the failed stage
+    if failed_result:
+        error_response["exit_code"] = failed_result.get('exit_code')
+        error_response["stderr"] = failed_result.get('stderr', '')
+        error_response["stdout"] = failed_result.get('stdout', '')
+        error_response["error_message"] = failed_result.get('error_message', '')
+        error_response["duration"] = failed_result.get('duration', 0)
+        error_response["outputs"] = failed_result.get('outputs', [])
+    
+    return jsonify(error_response), 400
 
 
 @app.route('/api/pipeline/stage/<stage_name>', methods=['POST'])

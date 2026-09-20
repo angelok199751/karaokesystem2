@@ -1,0 +1,87 @@
+/* Debug Console Styles */
+
+.debug-toolbar {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+}
+
+.logs-container {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 15px;
+    max-height: 400px;
+    overflow-y: auto;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.85rem;
+}
+
+.log-entry {
+    padding: 5px 0;
+    border-bottom: 1px solid #21262d;
+    display: flex;
+    gap: 10px;
+}
+
+.log-entry:last-child {
+    border-bottom: none;
+}
+
+.log-timestamp {
+    color: #8b949e;
+    min-width: 80px;
+}
+
+.log-level {
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 600;
+    min-width: 60px;
+    text-align: center;
+}
+
+.log-info {
+    background: #1f6feb;
+    color: #fff;
+}
+
+.log-warning {
+    background: #d29922;
+    color: #fff;
+}
+
+.log-error {
+    background: #da3633;
+    color: #fff;
+}
+
+.log-debug {
+    background: #238636;
+    color: #fff;
+}
+
+.log-message {
+    color: #c9d1d9;
+    flex: 1;
+    word-break: break-word;
+}
+
+/* Scrollbar */
+.logs-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+.logs-container::-webkit-scrollbar-track {
+    background: #0d1117;
+}
+
+.logs-container::-webkit-scrollbar-thumb {
+    background: #30363d;
+    border-radius: 4px;
+}
+
+.logs-container::-webkit-scrollbar-thumb:hover {
+    background: #484f58;
+}

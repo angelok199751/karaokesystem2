@@ -1,0 +1,149 @@
+/* Preview Player Styles */
+
+.lyrics-display {
+    text-align: center;
+    padding: 40px 20px;
+    background: #0f3460;
+    border-radius: 8px;
+    margin-bottom: 30px;
+    min-height: 200px;
+}
+
+.lyric-line {
+    font-size: 1.5rem;
+    padding: 15px 30px;
+    margin: 10px 0;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+    opacity: 0.5;
+}
+
+.lyric-line.previous,
+.lyric-line.next {
+    color: #888;
+}
+
+.lyric-line.current {
+    color: #fff;
+    font-size: 2rem;
+    font-weight: 700;
+    background: rgba(233, 69, 96, 0.3);
+    opacity: 1;
+    transform: scale(1.05);
+}
+
+.player-controls {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.progress-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    min-width: 200px;
+}
+
+#progress-bar {
+    flex: 1;
+    height: 8px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: #0f3460;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+#progress-bar::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    background: #e94560;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+#progress-bar::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+}
+
+#current-time,
+#total-duration {
+    font-family: monospace;
+    font-size: 1rem;
+    color: #888;
+    min-width: 50px;
+}
+
+/* Timeline */
+.timeline-container {
+    position: relative;
+    height: 100px;
+    background: #0f3460;
+    border-radius: 6px;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.timeline-marker {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    border-left: 2px solid #e94560;
+    padding-left: 5px;
+    font-size: 0.75rem;
+    color: #fff;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.timeline-marker:hover {
+    background: rgba(233, 69, 96, 0.2);
+}
+
+.timeline-label {
+    position: absolute;
+    bottom: 5px;
+    left: 5px;
+    font-size: 0.7rem;
+    color: #888;
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Debug Info */
+#debug-content {
+    font-family: monospace;
+    font-size: 0.85rem;
+    line-height: 1.8;
+}
+
+#debug-content h3 {
+    color: #e94560;
+    margin: 15px 0 10px 0;
+    font-size: 1rem;
+}
+
+#debug-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0;
+}
+
+#debug-content td {
+    padding: 5px 10px;
+    border-bottom: 1px solid #21262d;
+}
+
+#debug-content td:first-child {
+    color: #888;
+    width: 150px;
+}

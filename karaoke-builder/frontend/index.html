@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Karaoke Builder — Technical Prototype</title>
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/debug.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎤 Karaoke Builder</h1>
+            <p class="subtitle">Technical Prototype — New Generation Pipeline</p>
+        </header>
+
+        <!-- System Status -->
+        <section id="system-status" class="card">
+            <h2>System Status</h2>
+            <div id="status-content">
+                <p>Loading system information...</p>
+            </div>
+            <button id="btn-check-system" class="btn btn-secondary">Check System</button>
+        </section>
+
+        <!-- New Project Form -->
+        <section id="new-project" class="card">
+            <h2>New Project</h2>
+            
+            <form id="project-form">
+                <div class="form-group">
+                    <label for="title">Song Title (optional)</label>
+                    <input type="text" id="title" placeholder="Leave empty to use filename">
+                </div>
+
+                <div class="form-group">
+                    <label>Audio File (MP3)</label>
+                    <div class="file-drop-zone" id="mp3-drop-zone">
+                        <p>Drag & drop MP3 file here</p>
+                        <p>or</p>
+                        <button type="button" class="btn btn-secondary" onclick="document.getElementById('mp3-input').click()">
+                            Choose File
+                        </button>
+                        <input type="file" id="mp3-input" accept=".mp3,.wav,.flac,.m4a,.ogg,.aac" hidden>
+                    </div>
+                    <div id="mp3-info" class="file-info"></div>
+                </div>
+
+                <div class="form-group">
+                    <label>Lyrics File (TXT)</label>
+                    <div class="file-drop-zone" id="txt-drop-zone">
+                        <p>Drag & drop TXT file here</p>
+                        <p>or</p>
+                        <button type="button" class="btn btn-secondary" onclick="document.getElementById('txt-input').click()">
+                            Choose File
+                        </button>
+                        <input type="file" id="txt-input" accept=".txt,.lyrics" hidden>
+                    </div>
+                    <div id="txt-info" class="file-info"></div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" id="btn-create" class="btn btn-primary" disabled>
+                        Create Project
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        <!-- Pipeline Progress -->
+        <section id="pipeline-progress" class="card" style="display: none;">
+            <h2>Pipeline Progress</h2>
+            
+            <div class="stages">
+                <div class="stage" data-stage="validation">
+                    <div class="stage-icon">⏳</div>
+                    <div class="stage-info">
+                        <div class="stage-name">Input Validation</div>
+                        <div class="stage-status">Waiting...</div>
+                    </div>
+                </div>
+
+                <div class="stage" data-stage="demucs">
+                    <div class="stage-icon">⏳</div>
+                    <div class="stage-info">
+                        <div class="stage-name">Vocal Separation (Demucs)</div>
+                        <div class="stage-status">Waiting...</div>
+                    </div>
+                </div>
+
+                <div class="stage" data-stage="whisperx">
+                    <div class="stage-icon">⏳</div>
+                    <div class="stage-info">
+                        <div class="stage-name">Alignment (WhisperX)</div>
+                        <div class="stage-status">Waiting...</div>
+                    </div>
+                </div>
+
+                <div class="stage" data-stage="pitch">
+                    <div class="stage-icon">⏳</div>
+                    <div class="stage-info">
+                        <div class="stage-name">Pitch Analysis (torchcrepe)</div>
+                        <div class="stage-status">Waiting...</div>
+                    </div>
+                </div>
+
+                <div class="stage" data-stage="packaging">
+                    <div class="stage-icon">⏳</div>
+                    <div class="stage-info">
+                        <div class="stage-name">Packaging</div>
+                        <div class="stage-status">Waiting...</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="pipeline-error" class="error-box" style="display: none;"></div>
+
+            <div class="form-actions" id="pipeline-actions" style="display: none;">
+                <button id="btn-open-preview" class="btn btn-primary" style="display: none;">
+                    Open Preview ▶
+                </button>
+                <button id="btn-retry" class="btn btn-secondary" style="display: none;">
+                    Retry Failed Stage ↻
+                </button>
+            </div>
+        </section>
+
+        <!-- Debug Console -->
+        <section id="debug-console" class="card">
+            <h2>Debug Console</h2>
+            
+            <div class="debug-toolbar">
+                <button id="btn-refresh-logs" class="btn btn-small">Refresh</button>
+                <button id="btn-copy-logs" class="btn btn-small">Copy</button>
+                <button id="btn-save-logs" class="btn btn-small">Save Log</button>
+                <button id="btn-clear-logs" class="btn btn-small">Clear</button>
+            </div>
+
+            <div id="logs-container" class="logs-container">
+                <div class="log-entry">
+                    <span class="log-timestamp">--:--:--</span>
+                    <span class="log-level log-info">INFO</span>
+                    <span class="log-message">Ready. Load files to begin.</span>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script src="js/debug.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

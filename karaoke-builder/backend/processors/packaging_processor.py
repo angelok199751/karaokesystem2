@@ -84,8 +84,17 @@ class PackagingProcessor(BaseProcessor):
         
         # Convert instrumental to MP3 using FFmpeg
         debug_logger.log_info(self.name, "Converting to MP3...")
+        
+        from ..utils.ffmpeg_helper import get_ffmpeg_path
+        ffmpeg_path = get_ffmpeg_path()
+        
+        if not ffmpeg_path:
+            error_msg = "FFmpeg not found. Please install FFmpeg or add it to tools/ffmpeg/bin/"
+            debug_logger.log_error(self.name, error_msg)
+            return self._failure_result(error_msg)
+        
         command = [
-            "ffmpeg",
+            str(ffmpeg_path),
             "-i", str(self.context.instrumental_file),
             "-b:a", "192k",
             "-y",  # Overwrite

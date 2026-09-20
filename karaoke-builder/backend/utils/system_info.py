@@ -15,6 +15,8 @@ import subprocess
 from pathlib import Path
 from typing import Dict, Any, Optional
 
+from .ffmpeg_helper import check_ffmpeg as check_ffmpeg_bundled
+
 
 def get_system_info() -> Dict[str, Any]:
     """Get comprehensive system information"""
@@ -62,41 +64,8 @@ def get_system_info() -> Dict[str, Any]:
 
 
 def check_ffmpeg() -> Dict[str, Any]:
-    """Check FFmpeg installation"""
-    try:
-        result = subprocess.run(
-            ["ffmpeg", "-version"],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
-        
-        if result.returncode == 0:
-            version_line = result.stdout.split('\n')[0]
-            return {
-                "installed": True,
-                "version": version_line,
-                "available": True
-            }
-        else:
-            return {
-                "installed": False,
-                "available": False,
-                "error": "FFmpeg returned non-zero exit code"
-            }
-            
-    except FileNotFoundError:
-        return {
-            "installed": False,
-            "available": False,
-            "error": "FFmpeg not found in PATH"
-        }
-    except Exception as e:
-        return {
-            "installed": False,
-            "available": False,
-            "error": str(e)
-        }
+    """Check FFmpeg installation using bundled helper"""
+    return check_ffmpeg_bundled()
 
 
 def check_demucs() -> Dict[str, Any]:

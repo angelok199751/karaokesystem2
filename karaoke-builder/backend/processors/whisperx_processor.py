@@ -238,145 +238,253 @@ def main():
                     continue
                 
                 all_words.append({{
-                    "text": word_text,
+                    "text": word_text.lower(),
                     "start": round(word_start, 3),
                     "end": round(word_end, 3)
                 }})
         
-        # Match words to original lyrics lines
-        # We use a sequential approach: iterate through original lines and find matching words
-        word_idx = 0
-        total_words = len(all_words)
-        matched_lines_count = 0
-        unmatched_lines_count = 0
+        # Normalize original lines for matching
+        def normalize_text(text):
+            """Normalize text for fuzzy matching"""
+            import re
+            text = text.lower().strip()
+            # Remove punctuation except hyphens within words
+            text = re.sub(r'[^\\w\\s\\-]', ' ', text)
+            # Normalize whitespace
+            text = ' '.join(text.split())
+            return text
         
-        for orig_line in original_lines:
-            # Skip empty lines
+        normalized_original_lines = [(i, line, normalize_text(line)) 
+                                      for i, line in enumerate(original_lines)]
+        
+        # Find anchors: lines that can be matched to WhisperX words
+        # Returns: dict mapping original_line_index -> {{start, end, word_indices}}
+        anchors = {{}}
+        used_word_ranges = []  # List of (start_idx, end_idx) to avoid reuse
+        
+        def words_overlap(range1, range2):
+            """Check if two word index ranges overlap"""
+            return not (range1[1] <= range2[0] or range2[1] <= range1[0])
+        
+        def find_best_match(orig_normalized, start_search_idx=0):
+            """Find best matching word sequence for an original line"""
+            if not orig_normalized:
+                return None, None
+            
+            orig_words = orig_normalized.split()
+            best_match = None
+            best_score = 0
+            best_range = None
+            
+            # Try to find matching sequence starting from different positions
+            for start_idx in range(start_search_idx, min(start_search_idx + 50, len(all_words))):
+                temp_words = []
+                temp_text_parts = []
+                
+                for end_idx in range(start_idx, min(start_idx + 30, len(all_words))):
+                    word = all_words[end_idx]
+                    temp_words.append(word)
+                    temp_text_parts.append(word["text"])
+                    
+                    temp_combined = ' '.join(temp_text_parts)
+                    temp_words_list = temp_combined.split()
+                    
+                    # Calculate similarity score
+                    orig_set = set(orig_words)
+                    temp_set = set(temp_words_list)
+                    overlap = len(orig_set & temp_set)
+                    
+                    # Score based on word overlap and length similarity
+                    length_ratio = len(temp_combined) / max(len(orig_normalized), 1)
+                    length_score = 1.0 if 0.7 <= length_ratio <= 1.3 else max(0, 1.0 - abs(length_ratio - 1.0))
+                    
+                    word_overlap_ratio = overlap / max(len(orig_words), 1)
+                    score = word_overlap_ratio * 0.7 + length_score * 0.3
+                    
+                    # Check for containment
+                    if orig_normalized in temp_combined or temp_combined in orig_normalized:
+                        score = max(score, 0.9)
+                    
+                    if score > best_score and score >= 0.6:
+                        best_score = score
+                        best_match = {{
+                            "start": temp_words[0]["start"],
+                            "end": temp_words[-1]["end"],
+                            "words": temp_words
+                        }}
+                        best_range = (start_idx, end_idx + 1)
+                
+                # Early exit if we found a very good match
+                if best_score >= 0.9:
+                    break
+            
+            return best_match, best_range
+        
+        # Sequential anchor finding to handle repeated lines correctly
+        current_word_idx = 0
+        anchor_line_indices = []
+        
+        for orig_idx, orig_line, orig_normalized in normalized_original_lines:
+            if not orig_normalized:
+                continue
+            
+            match, word_range = find_best_match(orig_normalized, current_word_idx)
+            
+            if match and word_range:
+                # Check if this range overlaps with already used ranges
+                is_overlapping = False
+                for used_range in used_word_ranges:
+                    if words_overlap(word_range, used_range):
+                        is_overlapping = True
+                        break
+                
+                if not is_overlapping:
+                    anchors[orig_idx] = match
+                    used_word_ranges.append(word_range)
+                    anchor_line_indices.append(orig_idx)
+                    # Move search position forward
+                    current_word_idx = word_range[1]
+        
+        # Now build the final output with all lines
+        # For anchored lines: use real timestamps
+        # For interpolated lines: calculate timing based on neighbors
+        
+        output_lines = []
+        
+        # Get vocal time range from WhisperX
+        if all_words:
+            vocal_start = all_words[0]["start"]
+            vocal_end = all_words[-1]["end"]
+        else:
+            vocal_start = 0
+            vocal_end = 10  # fallback
+        
+        print(f"\\n=== Anchor Detection Results ===")
+        print(f"Total original lines: {{len(original_lines)}}")
+        print(f"Total WhisperX words: {{len(all_words)}}")
+        print(f"Anchors found: {{len(anchors)}}")
+        
+        # Process each original line
+        for orig_idx, orig_line, orig_normalized in normalized_original_lines:
             if not orig_line.strip():
                 continue
             
-            # Normalize the original line for matching (lowercase, remove extra punctuation/spaces)
-            orig_line_normalized = ' '.join(orig_line.lower().split())
-            orig_words_list = orig_line_normalized.split()
-            
-            # Try to find words that match this line
-            line_words = []
-            line_start = None
-            line_end = None
-            
-            # Collect words until we have enough to match the line
-            # We look for consecutive words whose combined text matches the original line
-            temp_words = []
-            temp_text_parts = []
-            start_idx = word_idx
-            best_match_words = []
-            best_match_len_diff = float('inf')
-            
-            while word_idx < total_words:
-                word = all_words[word_idx]
-                temp_words.append(word)
-                temp_text_parts.append(word["text"].lower())
-                
-                # Check if the accumulated text matches or contains the original line
-                temp_combined = ' '.join(temp_text_parts)
-                temp_combined_normalized = ' '.join(temp_combined.split())
-                temp_words_list = temp_combined_normalized.split()
-                
-                # Calculate similarity - check if lengths are roughly similar
-                len_diff = abs(len(temp_combined_normalized) - len(orig_line_normalized))
-                len_ratio = len(temp_combined_normalized) / max(len(orig_line_normalized), 1)
-                
-                # Check for partial match using simple heuristics
-                # Count how many words from original line appear in temp_combined
-                orig_words_set = set(orig_words_list)
-                temp_words_set = set(temp_words_list)
-                overlapping_words = orig_words_set & temp_words_set
-                
-                # Simple matching criteria:
-                # 1. Length is roughly similar (0.5x to 2.0x)
-                # 2. At least some words overlap, OR one contains the other
-                # 3. Prefer exact containment or high overlap ratio
-                is_match = False
-                if 0.5 <= len_ratio <= 2.0:
-                    # First priority: exact substring match
-                    if orig_line_normalized in temp_combined_normalized or temp_combined_normalized in orig_line_normalized:
-                        is_match = True
-                    # Second priority: most words match (at least 60% of original words found)
-                    elif len(orig_words_list) > 0 and len(overlapping_words) >= len(orig_words_list) * 0.6:
-                        is_match = True
-                    # Third priority: length very close AND majority of words match
-                    elif 0.7 <= len_ratio <= 1.3 and len(overlapping_words) >= max(1, len(orig_words_list) * 0.4):
-                        is_match = True
-                
-                # Track best match even if not perfect
-                if 0.5 <= len_ratio <= 2.0 and len(overlapping_words) > 0:
-                    if len_diff < best_match_len_diff:
-                        best_match_len_diff = len_diff
-                        best_match_words = list(temp_words)
-                
-                if is_match:
-                    # Good match, consume these words
-                    line_words.extend(temp_words)
-                    if line_start is None:
-                        line_start = temp_words[0]["start"]
-                    line_end = temp_words[-1]["end"]
-                    word_idx += len(temp_words)
-                    matched_lines_count += 1
-                    break
-                elif len(temp_combined_normalized) > len(orig_line_normalized) * 2.5:
-                    # Too much text accumulated without match, probably this line is missing or very different
-                    # Use best match if we have one
-                    if best_match_words:
-                        line_words.extend(best_match_words)
-                        line_start = best_match_words[0]["start"]
-                        line_end = best_match_words[-1]["end"]
-                        word_idx = start_idx + len(best_match_words)
-                        matched_lines_count += 1
-                    else:
-                        unmatched_lines_count += 1
-                        word_idx = start_idx
-                    break
-                
-                # Continue accumulating words
-                word_idx += 1
-            
-            # If we collected words for this line, add it to output
-            if line_words:
-                # Use ORIGINAL line text, not recognized text
-                output["lines"].append({{
-                    "start": round(line_start, 3) if line_start else 0,
-                    "end": round(line_end, 3) if line_end else 0,
-                    "text": orig_line,  # Use canonical text from lyrics.txt
-                    "words": line_words
+            if orig_idx in anchors:
+                # This is an anchor line - use real timestamps
+                anchor_data = anchors[orig_idx]
+                output_lines.append({{
+                    "text": orig_line,
+                    "start": round(anchor_data["start"], 3),
+                    "end": round(anchor_data["end"], 3),
+                    "is_anchor": True
+                }})
+                print(f"Anchor line {{orig_idx + 1}}: {{orig_line[:50]}}... -> {{anchor_data['start']:.2f}} - {{anchor_data['end']:.2f}}")
+            else:
+                # This line needs interpolation
+                output_lines.append({{
+                    "text": orig_line,
+                    "start": None,
+                    "end": None,
+                    "is_anchor": False,
+                    "orig_idx": orig_idx
                 }})
         
-        # Handle any remaining words that didn't match a specific line
-        # (e.g., if there are more recognized words than original lines)
-        remaining_words = all_words[word_idx:]
-        if remaining_words:
-            line_start = remaining_words[0]["start"]
-            line_end = remaining_words[-1]["end"]
-            line_text = " ".join(w["text"] for w in remaining_words)
+        # Interpolate timing for non-anchor lines
+        print(f"\\n=== Interpolation ===")
+        
+        def interpolate_timing(lines_to_interpolate, start_time, end_time, total_weight):
+            """Distribute time range among lines proportionally to their weight"""
+            if not lines_to_interpolate or total_weight <= 0:
+                return
             
-            output["lines"].append({{
-                "start": round(line_start, 3),
-                "end": round(line_end, 3),
-                "text": line_text,
-                "words": remaining_words
+            current_time = start_time
+            for i, line_data in enumerate(lines_to_interpolate):
+                # Weight based on character count (proxy for syllables/duration)
+                text_len = len(line_data["text"].strip())
+                weight = max(1, text_len)
+                
+                # Proportional duration
+                duration = (weight / total_weight) * (end_time - start_time)
+                
+                line_data["start"] = round(current_time, 3)
+                line_data["end"] = round(current_time + duration, 3)
+                
+                current_time += duration
+        
+        # Process segments between anchors
+        prev_anchor_end = vocal_start
+        
+        i = 0
+        while i < len(output_lines):
+            line_data = output_lines[i]
+            
+            if line_data["is_anchor"]:
+                prev_anchor_end = line_data["end"]
+                i += 1
+                continue
+            
+            # Found a non-anchor line, collect the segment
+            segment_start_idx = i
+            segment_lines = []
+            
+            while i < len(output_lines) and not output_lines[i]["is_anchor"]:
+                segment_lines.append(output_lines[i])
+                i += 1
+            
+            # Determine time boundaries for this segment
+            # Find previous anchor
+            start_time = prev_anchor_end
+            if segment_start_idx > 0:
+                for j in range(segment_start_idx - 1, -1, -1):
+                    if output_lines[j]["is_anchor"]:
+                        start_time = output_lines[j]["end"]
+                        break
+            
+            # Find next anchor
+            end_time = vocal_end
+            for j in range(i, len(output_lines)):
+                if output_lines[j]["is_anchor"]:
+                    end_time = output_lines[j]["start"]
+                    break
+            
+            # Calculate total weight
+            total_weight = sum(len(line["text"]) for line in segment_lines)
+            
+            if total_weight > 0 and end_time > start_time:
+                interpolate_timing(segment_lines, start_time, end_time, total_weight)
+                print(f"Interpolated lines {{segment_start_idx + 1}}-{{i}}: {{start_time:.2f}} - {{end_time:.2f}} ({{len(segment_lines)}} lines)")
+        
+        # Final statistics
+        anchored_count = sum(1 for line in output_lines if line["is_anchor"])
+        interpolated_count = sum(1 for line in output_lines if not line["is_anchor"])
+        
+        print(f"\\n=== Final Statistics ===")
+        print(f"Original lyrics lines: {{len(original_lines)}}")
+        print(f"WhisperX words found: {{len(all_words)}}")
+        print(f"Anchor lines: {{anchored_count}}")
+        print(f"Interpolated lines: {{interpolated_count}}")
+        print(f"Total output lines: {{len(output_lines)}}")
+        
+        # Clean up internal fields and prepare final output
+        final_output = {{
+            "format": "whisperx_aligned",
+            "version": 1,
+            "lines": []
+        }}
+        
+        for line_data in output_lines:
+            final_output["lines"].append({{
+                "text": line_data["text"],
+                "start": line_data["start"],
+                "end": line_data["end"]
             }})
         
         # Save output
-        print(f"Saving to {{OUTPUT_PATH}}")
+        print(f"\\nSaving to {{OUTPUT_PATH}}")
         with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
-            json.dump(output, f, ensure_ascii=False, indent=2)
+            json.dump(final_output, f, ensure_ascii=False, indent=2)
         
-        # Print statistics
-        print(f"Original lyrics lines: {{len(original_lines)}}")
-        print(f"WhisperX words found: {{len(all_words)}}")
-        print(f"Successfully matched lines: {{matched_lines_count}}")
-        print(f"Unmatched lines: {{unmatched_lines_count}}")
-        total_output_words = sum(len(line.get("words", [])) for line in output["lines"])
-        print(f"Success! Created {{len(output['lines'])}} lines with {{total_output_words}} words")
+        print(f"Success! Created {{len(final_output['lines'])}} lines")
         
     except Exception as e:
         print(f"ERROR: {{str(e)}}", file=sys.stderr)

@@ -1,18 +1,1 @@
-```
-# Python
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-
-# Logs
-*.log
-logs/
-
-# Environment
-.env
-.env.local
-.env.*
-venv/
-.venv/
-```
+Nothing should be ignored based on the provided file changes. The only modified file is a Python source file (`karaoke-builder/backend/processors/whisperx_processor.py`), which should not be added to .gitignore.

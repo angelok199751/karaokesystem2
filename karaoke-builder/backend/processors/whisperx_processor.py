@@ -136,8 +136,9 @@ class WhisperXProcessor(BaseProcessor):
                                 output_path: str, model: str) -> str:
         """Build Python script for WhisperX processing"""
         
-        # Escape strings for embedding in script
-        lyrics_escaped = lyrics_text.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n')
+        # Escape double quotes and backslashes for embedding in script
+        # Keep newlines as-is so they are preserved in the triple-quoted string
+        lyrics_escaped = lyrics_text.replace('\\', '\\\\').replace('"', '\\"')
         
         return f'''#!/usr/bin/env python3
 """
@@ -160,7 +161,7 @@ except ImportError as e:
 
 # Configuration
 VOCALS_PATH = r"{vocals_path}"
-LYRICS_TEXT = r"""{lyrics_escaped}"""
+LYRICS_TEXT = """{lyrics_escaped}"""
 OUTPUT_PATH = r"{output_path}"
 MODEL_NAME = "{model}"
 

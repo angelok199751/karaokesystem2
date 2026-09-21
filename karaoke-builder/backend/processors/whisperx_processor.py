@@ -258,8 +258,11 @@ def main():
                                       for i, line in enumerate(original_lines)]
         
         # Find anchors: lines that can be matched to WhisperX words
-        # Returns: dict mapping original_line_index -> {{start, end, word_indices}}
-        anchors = {{}}
+        # TWO-STAGE PROCESS: 1) Find candidates, 2) Validate strictly
+        # Returns: dict mapping original_line_index -> {{start, end, word_indices, ...}}
+        
+        # STAGE 1: Find all candidate anchors
+        candidates = []  # List of (orig_idx, match_data, word_range, similarity, matched_words_count)
         used_word_ranges = []  # List of (start_idx, end_idx) to avoid reuse
         
         def words_overlap(range1, range2):
@@ -269,7 +272,7 @@ def main():
         def find_best_match(orig_normalized, start_search_idx=0):
             """Find best matching word sequence for an original line"""
             if not orig_normalized:
-                return None, None
+                return None, None, 0
             
             orig_words = orig_normalized.split()
             best_match = None
@@ -318,17 +321,16 @@ def main():
                 if best_score >= 0.9:
                     break
             
-            return best_match, best_range
+            return best_match, best_range, best_score
         
-        # Sequential anchor finding to handle repeated lines correctly
+        # Sequential candidate finding to handle repeated lines correctly
         current_word_idx = 0
-        anchor_line_indices = []
         
         for orig_idx, orig_line, orig_normalized in normalized_original_lines:
             if not orig_normalized:
                 continue
             
-            match, word_range = find_best_match(orig_normalized, current_word_idx)
+            match, word_range, similarity = find_best_match(orig_normalized, current_word_idx)
             
             if match and word_range:
                 # Check if this range overlaps with already used ranges
@@ -339,21 +341,94 @@ def main():
                         break
                 
                 if not is_overlapping:
-                    anchors[orig_idx] = {{
+                    matched_words_count = len(match["words"])
+                    duration = match["end"] - match["start"]
+                    
+                    candidates.append({{
+                        "orig_idx": orig_idx,
+                        "orig_line": orig_line,
+                        "orig_normalized": orig_normalized,
                         "start": match["start"],
                         "end": match["end"],
+                        "duration": duration,
                         "words": match["words"],
                         "word_range": word_range,
-                        "text_length": len(orig_normalized)
-                    }}
+                        "similarity": similarity,
+                        "matched_words": matched_words_count,
+                        "text_length": len(orig_normalized),
+                        "num_words_in_line": len(orig_normalized.split())
+                    }})
                     used_word_ranges.append(word_range)
-                    anchor_line_indices.append(orig_idx)
                     # Move search position forward past this match
                     current_word_idx = word_range[1]
+        
+        print(f"\\n=== Candidate Anchors Found: {len(candidates)} ===")
+        
+        # STAGE 2: Strict validation of candidates
+        accepted_anchors = {{}}
+        rejected_candidates = []
+        last_accepted_end = -1
+        
+        def validate_candidate(cand, prev_end):
+            """Validate a candidate anchor against strict criteria"""
+            reasons = []
+            
+            # Criterion 1: Minimum similarity
+            if cand["similarity"] < 0.65:
+                reasons.append(f"similarity_too_low ({cand['similarity']:.2f} < 0.65)")
+            
+            # Criterion 2: Minimum matched words
+            if cand["matched_words"] < 2:
+                reasons.append(f"too_few_words ({cand['matched_words']} < 2)")
+            
+            # Criterion 3: Minimum duration (with soft check for short lines)
+            min_duration_for_words = max(0.15, cand["num_words_in_line"] * 0.08)
+            if cand["duration"] < min_duration_for_words:
+                reasons.append(f"duration_too_short ({cand['duration']:.2f}s < {min_duration_for_words:.2f}s expected for {cand['num_words_in_line']} words)")
+            
+            # Criterion 4: Duration vs text length sanity check
+            # Very long text cannot fit in very short duration
+            words_per_sec = cand["num_words_in_line"] / max(cand["duration"], 0.01)
+            if words_per_sec > 12:  # More than 12 words per second is suspicious
+                reasons.append(f"unrealistic_speed ({words_per_sec:.1f} words/sec)")
+            
+            # Criterion 5: Sequential ordering (must come after previous accepted anchor)
+            if cand["start"] < prev_end - 0.1:  # Small tolerance for rounding
+                reasons.append(f"out_of_order (starts at {cand['start']:.2f} but prev ended at {prev_end:.2f})")
+            
+            return reasons
+        
+        for cand in candidates:
+            validation_errors = validate_candidate(cand, last_accepted_end)
+            
+            if not validation_errors:
+                # Accept this anchor
+                accepted_anchors[cand["orig_idx"]] = {{
+                    "start": cand["start"],
+                    "end": cand["end"],
+                    "duration": cand["duration"],
+                    "words": cand["words"],
+                    "word_range": cand["word_range"],
+                    "similarity": cand["similarity"],
+                    "matched_words": cand["matched_words"],
+                    "text_length": cand["text_length"],
+                    "num_words_in_line": cand["num_words_in_line"]
+                }}
+                last_accepted_end = cand["end"]
+                print(f"ACCEPT anchor line {cand['orig_idx'] + 1}: sim={cand['similarity']:.2f}, words={cand['matched_words']}, dur={cand['duration']:.2f}s")
             else:
-                # No match found, but continue searching from current position
-                # This allows us to skip problematic sections
-                pass
+                # Reject this candidate
+                rejected_candidates.append((cand, validation_errors))
+                reason_str = "; ".join(validation_errors)
+                print(f"REJECT anchor line {cand['orig_idx'] + 1}: sim={cand['similarity']:.2f}, words={cand['matched_words']}, dur={cand['duration']:.2f}s | REASONS: {reason_str}")
+        
+        print(f"\\n=== Anchor Validation Summary ===")
+        print(f"Candidate anchors: {len(candidates)}")
+        print(f"Accepted anchors: {len(accepted_anchors)}")
+        print(f"Rejected anchors: {len(rejected_candidates)}")
+        
+        # Use accepted_anchors for further processing
+        anchors = accepted_anchors
         
         # Now build the final output with all lines
         # For anchored lines: use anchor as reference point within the line

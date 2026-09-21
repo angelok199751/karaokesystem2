@@ -328,7 +328,9 @@ def main():
         with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
             json.dump(output, f, ensure_ascii=False, indent=2)
         
-        print(f"Success! Created {{len(output['lines'])}} lines with {{len(current_line_words)}} words")
+        # Count total words in all lines
+        total_words = sum(len(line.get("words", [])) for line in output["lines"])
+        print(f"Success! Created {{len(output['lines'])}} lines with {{total_words}} words")
         
     except Exception as e:
         print(f"ERROR: {{str(e)}}", file=sys.stderr)

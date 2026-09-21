@@ -243,13 +243,20 @@ def main():
                 }})
         
         # Match words to original lyrics lines
-        # We use a simple approach: iterate through original lines and find matching words
+        # We use a sequential approach: iterate through original lines and find matching words
         word_idx = 0
         total_words = len(all_words)
+        matched_lines_count = 0
+        unmatched_lines_count = 0
         
         for orig_line in original_lines:
-            # Normalize the original line for matching (lowercase, remove punctuation)
-            orig_line_normalized = orig_line.lower()
+            # Skip empty lines
+            if not orig_line.strip():
+                continue
+            
+            # Normalize the original line for matching (lowercase, remove extra punctuation/spaces)
+            orig_line_normalized = ' '.join(orig_line.lower().split())
+            orig_words_list = orig_line_normalized.split()
             
             # Try to find words that match this line
             line_words = []
@@ -260,6 +267,9 @@ def main():
             # We look for consecutive words whose combined text matches the original line
             temp_words = []
             temp_text_parts = []
+            start_idx = word_idx
+            best_match_words = []
+            best_match_len_diff = float('inf')
             
             while word_idx < total_words:
                 word = all_words[word_idx]
@@ -267,44 +277,75 @@ def main():
                 temp_text_parts.append(word["text"].lower())
                 
                 # Check if the accumulated text matches or contains the original line
-                temp_combined = " ".join(temp_text_parts)
+                temp_combined = ' '.join(temp_text_parts)
+                temp_combined_normalized = ' '.join(temp_combined.split())
+                temp_words_list = temp_combined_normalized.split()
                 
-                # Simple heuristic: if we've collected enough words to cover the line length
-                # and the line text is contained in or equals the combined words
-                if len(temp_combined) >= len(orig_line_normalized) * 0.7:
-                    # Check if this roughly matches the original line
-                    # We allow some flexibility for recognition errors
-                    if orig_line_normalized in temp_combined or temp_combined in orig_line_normalized:
-                        # Good match, consume these words
-                        line_words.extend(temp_words)
-                        if line_start is None:
-                            line_start = temp_words[0]["start"]
-                        line_end = temp_words[-1]["end"]
-                        word_idx += len(temp_words)
-                        break
-                    elif len(temp_combined) > len(orig_line_normalized) * 1.5:
-                        # Too much text, probably moved past this line
-                        # Take what we have if we have anything
-                        if temp_words:
-                            line_words.extend(temp_words)
-                            if line_start is None:
-                                line_start = temp_words[0]["start"]
-                            line_end = temp_words[-1]["end"]
-                            word_idx += len(temp_words)
-                        break
+                # Calculate similarity - check if lengths are roughly similar
+                len_diff = abs(len(temp_combined_normalized) - len(orig_line_normalized))
+                len_ratio = len(temp_combined_normalized) / max(len(orig_line_normalized), 1)
                 
+                # Check for partial match using simple heuristics
+                # Count how many words from original line appear in temp_combined
+                orig_words_set = set(orig_words_list)
+                temp_words_set = set(temp_words_list)
+                overlapping_words = orig_words_set & temp_words_set
+                
+                # Simple matching criteria:
+                # 1. Length is roughly similar (0.5x to 2.0x)
+                # 2. At least some words overlap, OR one contains the other
+                # 3. Prefer exact containment or high overlap ratio
+                is_match = False
+                if 0.5 <= len_ratio <= 2.0:
+                    # First priority: exact substring match
+                    if orig_line_normalized in temp_combined_normalized or temp_combined_normalized in orig_line_normalized:
+                        is_match = True
+                    # Second priority: most words match (at least 60% of original words found)
+                    elif len(orig_words_list) > 0 and len(overlapping_words) >= len(orig_words_list) * 0.6:
+                        is_match = True
+                    # Third priority: length very close AND majority of words match
+                    elif 0.7 <= len_ratio <= 1.3 and len(overlapping_words) >= max(1, len(orig_words_list) * 0.4):
+                        is_match = True
+                
+                # Track best match even if not perfect
+                if 0.5 <= len_ratio <= 2.0 and len(overlapping_words) > 0:
+                    if len_diff < best_match_len_diff:
+                        best_match_len_diff = len_diff
+                        best_match_words = list(temp_words)
+                
+                if is_match:
+                    # Good match, consume these words
+                    line_words.extend(temp_words)
+                    if line_start is None:
+                        line_start = temp_words[0]["start"]
+                    line_end = temp_words[-1]["end"]
+                    word_idx += len(temp_words)
+                    matched_lines_count += 1
+                    break
+                elif len(temp_combined_normalized) > len(orig_line_normalized) * 2.5:
+                    # Too much text accumulated without match, probably this line is missing or very different
+                    # Use best match if we have one
+                    if best_match_words:
+                        line_words.extend(best_match_words)
+                        line_start = best_match_words[0]["start"]
+                        line_end = best_match_words[-1]["end"]
+                        word_idx = start_idx + len(best_match_words)
+                        matched_lines_count += 1
+                    else:
+                        unmatched_lines_count += 1
+                        word_idx = start_idx
+                    break
+                
+                # Continue accumulating words
                 word_idx += 1
-                temp_words = []
-                temp_text_parts = []
             
             # If we collected words for this line, add it to output
             if line_words:
-                line_text = " ".join(w["text"] for w in line_words)
-                
+                # Use ORIGINAL line text, not recognized text
                 output["lines"].append({{
                     "start": round(line_start, 3) if line_start else 0,
                     "end": round(line_end, 3) if line_end else 0,
-                    "text": line_text,
+                    "text": orig_line,  # Use canonical text from lyrics.txt
                     "words": line_words
                 }})
         
@@ -328,9 +369,13 @@ def main():
         with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
             json.dump(output, f, ensure_ascii=False, indent=2)
         
-        # Count total words in all lines
-        total_words = sum(len(line.get("words", [])) for line in output["lines"])
-        print(f"Success! Created {{len(output['lines'])}} lines with {{total_words}} words")
+        # Print statistics
+        print(f"Original lyrics lines: {{len(original_lines)}}")
+        print(f"WhisperX words found: {{len(all_words)}}")
+        print(f"Successfully matched lines: {{matched_lines_count}}")
+        print(f"Unmatched lines: {{unmatched_lines_count}}")
+        total_output_words = sum(len(line.get("words", [])) for line in output["lines"])
+        print(f"Success! Created {{len(output['lines'])}} lines with {{total_output_words}} words")
         
     except Exception as e:
         print(f"ERROR: {{str(e)}}", file=sys.stderr)

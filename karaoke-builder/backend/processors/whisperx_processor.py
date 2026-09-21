@@ -339,14 +339,24 @@ def main():
                         break
                 
                 if not is_overlapping:
-                    anchors[orig_idx] = match
+                    anchors[orig_idx] = {{
+                        "start": match["start"],
+                        "end": match["end"],
+                        "words": match["words"],
+                        "word_range": word_range,
+                        "text_length": len(orig_normalized)
+                    }}
                     used_word_ranges.append(word_range)
                     anchor_line_indices.append(orig_idx)
-                    # Move search position forward
+                    # Move search position forward past this match
                     current_word_idx = word_range[1]
+            else:
+                # No match found, but continue searching from current position
+                # This allows us to skip problematic sections
+                pass
         
         # Now build the final output with all lines
-        # For anchored lines: use real timestamps
+        # For anchored lines: use anchor as reference point within the line
         # For interpolated lines: calculate timing based on neighbors
         
         output_lines = []
@@ -370,93 +380,200 @@ def main():
                 continue
             
             if orig_idx in anchors:
-                # This is an anchor line - use real timestamps
+                # This is an anchor line - store anchor data for later processing
                 anchor_data = anchors[orig_idx]
                 output_lines.append({{
                     "text": orig_line,
-                    "start": round(anchor_data["start"], 3),
-                    "end": round(anchor_data["end"], 3),
-                    "is_anchor": True
+                    "anchor_start": anchor_data["start"],
+                    "anchor_end": anchor_data["end"],
+                    "word_range": anchor_data["word_range"],
+                    "text_length": anchor_data["text_length"],
+                    "is_anchor": True,
+                    "orig_idx": orig_idx
                 }})
-                print(f"Anchor line {{orig_idx + 1}}: {{orig_line[:50]}}... -> {{anchor_data['start']:.2f}} - {{anchor_data['end']:.2f}}")
+                print(f"Anchor line {{orig_idx + 1}}: {{orig_line[:50]}}... -> anchor at {{anchor_data['start']:.2f}} - {{anchor_data['end']:.2f}}")
             else:
                 # This line needs interpolation
                 output_lines.append({{
                     "text": orig_line,
-                    "start": None,
-                    "end": None,
+                    "text_length": len(orig_normalized),
                     "is_anchor": False,
                     "orig_idx": orig_idx
                 }})
         
-        # Interpolate timing for non-anchor lines
-        print(f"\\n=== Interpolation ===")
+        # Now calculate final start/end times for all lines
+        print(f"\\n=== Calculating Line Timings ===")
         
-        def interpolate_timing(lines_to_interpolate, start_time, end_time, total_weight):
-            """Distribute time range among lines proportionally to their weight"""
-            if not lines_to_interpolate or total_weight <= 0:
-                return
-            
-            current_time = start_time
-            for i, line_data in enumerate(lines_to_interpolate):
-                # Weight based on character count (proxy for syllables/duration)
-                text_len = len(line_data["text"].strip())
-                weight = max(1, text_len)
-                
-                # Proportional duration
-                duration = (weight / total_weight) * (end_time - start_time)
-                
-                line_data["start"] = round(current_time, 3)
-                line_data["end"] = round(current_time + duration, 3)
-                
-                current_time += duration
+        # Helper to calculate weight for a line
+        def get_line_weight(line_data):
+            """Weight based on text length (proxy for syllables/duration)"""
+            return max(1, line_data.get("text_length", len(line_data["text"])))
         
-        # Process segments between anchors
+        # Process all lines to assign start/end times
         prev_anchor_end = vocal_start
-        
         i = 0
+        
         while i < len(output_lines):
             line_data = output_lines[i]
             
             if line_data["is_anchor"]:
-                prev_anchor_end = line_data["end"]
-                i += 1
-                continue
-            
-            # Found a non-anchor line, collect the segment
-            segment_start_idx = i
-            segment_lines = []
-            
-            while i < len(output_lines) and not output_lines[i]["is_anchor"]:
-                segment_lines.append(output_lines[i])
-                i += 1
-            
-            # Determine time boundaries for this segment
-            # Find previous anchor
-            start_time = prev_anchor_end
-            if segment_start_idx > 0:
-                for j in range(segment_start_idx - 1, -1, -1):
+                # Find the next anchor to determine the end boundary for this anchor line
+                next_anchor_start = vocal_end
+                for j in range(i + 1, len(output_lines)):
                     if output_lines[j]["is_anchor"]:
-                        start_time = output_lines[j]["end"]
+                        next_anchor_start = output_lines[j]["anchor_start"]
                         break
-            
-            # Find next anchor
-            end_time = vocal_end
-            for j in range(i, len(output_lines)):
-                if output_lines[j]["is_anchor"]:
-                    end_time = output_lines[j]["start"]
-                    break
-            
-            # Calculate total weight
-            total_weight = sum(len(line["text"]) for line in segment_lines)
-            
-            if total_weight > 0 and end_time > start_time:
-                interpolate_timing(segment_lines, start_time, end_time, total_weight)
-                print(f"Interpolated lines {{segment_start_idx + 1}}-{{i}}: {{start_time:.2f}} - {{end_time:.2f}} ({{len(segment_lines)}} lines)")
+                
+                # For anchor lines, we need to distribute time between this anchor and the next
+                # The anchor point should be somewhere within the line's duration
+                # Use anchor_start as the line start, and interpolate to next anchor
+                
+                # Collect consecutive anchor lines (no interpolation needed between them)
+                anchor_group_start = i
+                anchor_group_end = i + 1
+                
+                # Look ahead for consecutive anchors
+                while anchor_group_end < len(output_lines) and output_lines[anchor_group_end]["is_anchor"]:
+                    anchor_group_end += 1
+                
+                # If there are more lines after this anchor group, find the next anchor or vocal_end
+                if anchor_group_end < len(output_lines):
+                    # There might be interpolated lines followed by an anchor
+                    for j in range(anchor_group_end, len(output_lines)):
+                        if output_lines[j]["is_anchor"]:
+                            next_anchor_start = output_lines[j]["anchor_start"]
+                            break
+                
+                # Process anchor lines in this group
+                for k in range(anchor_group_start, anchor_group_end):
+                    anchor_line = output_lines[k]
+                    
+                    # Determine start time
+                    if k == anchor_group_start:
+                        # First anchor in group: use previous boundary or anchor_start
+                        line_start = max(prev_anchor_end, anchor_line["anchor_start"])
+                    else:
+                        # Subsequent anchors: use previous anchor's calculated end
+                        line_start = output_lines[k - 1]["end"]
+                    
+                    # Determine end time
+                    if k == anchor_group_end - 1:
+                        # Last anchor in group: interpolate to next anchor or vocal_end
+                        if anchor_group_end < len(output_lines):
+                            # Find next anchor start
+                            for j in range(anchor_group_end, len(output_lines)):
+                                if output_lines[j]["is_anchor"]:
+                                    next_anchor_start = output_lines[j]["anchor_start"]
+                                    break
+                            # Give this anchor line reasonable duration
+                            # Use anchor_end as reference, but ensure it doesn't overlap with next anchor
+                            line_end = min(anchor_line["anchor_end"], next_anchor_start - 0.1)
+                        else:
+                            # No more anchors, use vocal_end
+                            line_end = vocal_end
+                    else:
+                        # Not the last anchor in group: end before next anchor in group
+                        next_in_group = output_lines[k + 1]
+                        line_end = next_in_group["anchor_start"] - 0.05
+                    
+                    # Ensure minimum duration
+                    min_duration = 0.5
+                    if line_end - line_start < min_duration:
+                        # Extend end time, but don't overlap with next anchor
+                        if k < len(output_lines) - 1 and output_lines[k + 1]["is_anchor"]:
+                            max_end = output_lines[k + 1]["anchor_start"] - 0.05
+                        else:
+                            max_end = vocal_end
+                        line_end = min(line_start + max(min_duration, anchor_line["anchor_end"] - anchor_line["anchor_start"]), max_end)
+                    
+                    anchor_line["start"] = round(line_start, 3)
+                    anchor_line["end"] = round(line_end, 3)
+                    
+                    print(f"Line {{k + 1}} (ANCHOR): {{line_start:.2f}} - {{line_end:.2f}} ({{line_end - line_start:.2f}}s) | {{anchor_line['text'][:40]}}...")
+                
+                i = anchor_group_end
+                if i > 0:
+                    prev_anchor_end = output_lines[i - 1]["end"]
+            else:
+                # Found a non-anchor line, collect the segment of consecutive non-anchor lines
+                segment_start_idx = i
+                segment_lines = []
+                
+                while i < len(output_lines) and not output_lines[i]["is_anchor"]:
+                    segment_lines.append(output_lines[i])
+                    i += 1
+                
+                # Determine time boundaries for this segment
+                # Find previous anchor end
+                start_time = prev_anchor_end
+                if segment_start_idx > 0:
+                    for j in range(segment_start_idx - 1, -1, -1):
+                        if output_lines[j]["is_anchor"]:
+                            start_time = output_lines[j]["end"]
+                            break
+                
+                # Find next anchor start
+                end_time = vocal_end
+                for j in range(i, len(output_lines)):
+                    if output_lines[j]["is_anchor"]:
+                        end_time = output_lines[j]["anchor_start"]
+                        break
+                
+                # Calculate total weight
+                total_weight = sum(get_line_weight(line) for line in segment_lines)
+                
+                if total_weight > 0 and end_time > start_time:
+                    # Distribute time proportionally
+                    current_time = start_time
+                    for line_data in segment_lines:
+                        weight = get_line_weight(line_data)
+                        duration = (weight / total_weight) * (end_time - start_time)
+                        
+                        # Ensure minimum duration
+                        duration = max(duration, 0.5)
+                        
+                        line_data["start"] = round(current_time, 3)
+                        line_data["end"] = round(current_time + duration, 3)
+                        
+                        print(f"Line {{segment_lines.index(line_data) + segment_start_idx + 1}} (INTERP): {{line_data['start']:.2f}} - {{line_data['end']:.2f}} ({{duration:.2f}}s) | {{line_data['text'][:40]}}...")
+                        
+                        current_time += duration
+                else:
+                    # Fallback: assign minimal durations
+                    current_time = start_time
+                    for line_data in segment_lines:
+                        line_data["start"] = round(current_time, 3)
+                        line_data["end"] = round(current_time + 0.5, 3)
+                        current_time += 0.5
         
-        # Final statistics
+        # Final validation and cleanup
+        print(f"\\n=== Final Line Timings Validation ===")
+        
         anchored_count = sum(1 for line in output_lines if line["is_anchor"])
         interpolated_count = sum(1 for line in output_lines if not line["is_anchor"])
+        
+        warnings_list = []
+        
+        for idx, line_data in enumerate(output_lines):
+            duration = line_data["end"] - line_data["start"]
+            
+            # Check for suspiciously short lines
+            if duration < 0.3:
+                warnings_list.append(f"WARNING: Line {{idx + 1}} suspiciously short: {{duration:.3f}}s")
+            
+            # Check for suspiciously long lines
+            if duration > 15:
+                warnings_list.append(f"WARNING: Line {{idx + 1}} suspiciously long: {{duration:.3f}}s")
+            
+            # Check for overlapping lines
+            if idx > 0:
+                prev_end = output_lines[idx - 1]["end"]
+                curr_start = line_data["start"]
+                if curr_start < prev_end - 0.05:  # Allow small gap
+                    warnings_list.append(f"WARNING: Lines {{idx}} and {{idx + 1}} may overlap: {{prev_end:.2f}} vs {{curr_start:.2f}}")
+        
+        for warning in warnings_list:
+            print(warning)
         
         print(f"\\n=== Final Statistics ===")
         print(f"Original lyrics lines: {{len(original_lines)}}")

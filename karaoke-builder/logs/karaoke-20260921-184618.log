@@ -1,0 +1,12 @@
+2026-09-21 18:46:18,345 - INFO - karaoke_builder - [WhisperX] Lyrics: 3 lines
+2026-09-21 18:46:18,346 - INFO - karaoke_builder - [WhisperX] WhisperX: FFmpeg path: /usr/bin/ffmpeg
+2026-09-21 18:46:18,347 - INFO - karaoke_builder - [WhisperX] WhisperX: FFmpeg exists: True
+2026-09-21 18:46:18,347 - INFO - karaoke_builder - [WhisperX] Using model: medium
+2026-09-21 18:46:18,347 - INFO - karaoke_builder - [WhisperX] Output: words.json
+2026-09-21 18:46:18,347 - INFO - karaoke_builder - [WhisperX] Starting stage: WhisperX
+2026-09-21 18:46:18,347 - INFO - karaoke_builder - [WhisperX] Input: vocals.wav (861.4 KB)
+2026-09-21 18:46:18,347 - INFO - karaoke_builder - [WhisperX] Command: /usr/local/bin/python temp/test-whisperx-fix/whisperx/run_whisperx.py
+2026-09-21 18:46:18,347 - INFO - karaoke_builder - [WhisperX] Executing... (timeout: 1800s)
+2026-09-21 18:46:18,358 - ERROR - karaoke_builder - [WhisperX_stderr] /usr/local/bin/python: can't open file '/workspace/karaoke-builder/temp/test-whisperx-fix/temp/test-whisperx-fix/whisperx/run_whisperx.py': [Errno 2] No such file or directory
+
+2026-09-21 18:46:18,358 - ERROR - karaoke_builder - [WhisperX] Process exited with code 2

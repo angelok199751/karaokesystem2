@@ -222,21 +222,12 @@ def main():
         }}
         
         # Group segments into lines based on original lyrics
-        # This is a simplified approach - production version would need better matching
+        # Match recognized words to original lyric lines by text content
         
-        current_line_idx = 0
-        current_line_words = []
-        current_line_start = None
-        current_line_end = None
-        
+        # Build a list of all recognized words in order
+        all_words = []
         for segment in result.get("segments", []):
-            segment_text = segment.get("text", "").strip()
-            segment_start = segment.get("start", 0)
-            segment_end = segment.get("end", 0)
-            
-            # Get words from this segment
             words_in_segment = segment.get("words", [])
-            
             for word_info in words_in_segment:
                 word_text = word_info.get("word", "").strip()
                 word_start = word_info.get("start", 0)
@@ -245,26 +236,91 @@ def main():
                 if not word_text:
                     continue
                 
-                current_line_words.append({{
+                all_words.append({{
                     "text": word_text,
                     "start": round(word_start, 3),
                     "end": round(word_end, 3)
                 }})
-                
-                if current_line_start is None:
-                    current_line_start = word_start
-                current_line_end = word_end
         
-        # If we have words, create a single line (simplified for prototype)
-        # TODO: Implement proper line matching with original lyrics
-        if current_line_words:
-            line_text = " ".join(w["text"] for w in current_line_words)
+        # Match words to original lyrics lines
+        # We use a simple approach: iterate through original lines and find matching words
+        word_idx = 0
+        total_words = len(all_words)
+        
+        for orig_line in original_lines:
+            # Normalize the original line for matching (lowercase, remove punctuation)
+            orig_line_normalized = orig_line.lower()
+            
+            # Try to find words that match this line
+            line_words = []
+            line_start = None
+            line_end = None
+            
+            # Collect words until we have enough to match the line
+            # We look for consecutive words whose combined text matches the original line
+            temp_words = []
+            temp_text_parts = []
+            
+            while word_idx < total_words:
+                word = all_words[word_idx]
+                temp_words.append(word)
+                temp_text_parts.append(word["text"].lower())
+                
+                # Check if the accumulated text matches or contains the original line
+                temp_combined = " ".join(temp_text_parts)
+                
+                # Simple heuristic: if we've collected enough words to cover the line length
+                # and the line text is contained in or equals the combined words
+                if len(temp_combined) >= len(orig_line_normalized) * 0.7:
+                    # Check if this roughly matches the original line
+                    # We allow some flexibility for recognition errors
+                    if orig_line_normalized in temp_combined or temp_combined in orig_line_normalized:
+                        # Good match, consume these words
+                        line_words.extend(temp_words)
+                        if line_start is None:
+                            line_start = temp_words[0]["start"]
+                        line_end = temp_words[-1]["end"]
+                        word_idx += len(temp_words)
+                        break
+                    elif len(temp_combined) > len(orig_line_normalized) * 1.5:
+                        # Too much text, probably moved past this line
+                        # Take what we have if we have anything
+                        if temp_words:
+                            line_words.extend(temp_words)
+                            if line_start is None:
+                                line_start = temp_words[0]["start"]
+                            line_end = temp_words[-1]["end"]
+                            word_idx += len(temp_words)
+                        break
+                
+                word_idx += 1
+                temp_words = []
+                temp_text_parts = []
+            
+            # If we collected words for this line, add it to output
+            if line_words:
+                line_text = " ".join(w["text"] for w in line_words)
+                
+                output["lines"].append({{
+                    "start": round(line_start, 3) if line_start else 0,
+                    "end": round(line_end, 3) if line_end else 0,
+                    "text": line_text,
+                    "words": line_words
+                }})
+        
+        # Handle any remaining words that didn't match a specific line
+        # (e.g., if there are more recognized words than original lines)
+        remaining_words = all_words[word_idx:]
+        if remaining_words:
+            line_start = remaining_words[0]["start"]
+            line_end = remaining_words[-1]["end"]
+            line_text = " ".join(w["text"] for w in remaining_words)
             
             output["lines"].append({{
-                "start": round(current_line_start, 3) if current_line_start else 0,
-                "end": round(current_line_end, 3) if current_line_end else 0,
+                "start": round(line_start, 3),
+                "end": round(line_end, 3),
                 "text": line_text,
-                "words": current_line_words
+                "words": remaining_words
             }})
         
         # Save output

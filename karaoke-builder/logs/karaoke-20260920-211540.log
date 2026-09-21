@@ -1,0 +1,10 @@
+2026-09-20 21:15:40,587 - INFO - karaoke_builder - [Demucs] Using model: htdemucs
+2026-09-20 21:15:40,588 - INFO - karaoke_builder - [Demucs] Output directory: /workspace/karaoke-builder/temp/test-job/demucs
+2026-09-20 21:15:40,588 - INFO - karaoke_builder - [Demucs] Starting stage: Demucs
+2026-09-20 21:15:40,588 - INFO - karaoke_builder - [Demucs] Input: input.mp3 (39.6 KB)
+2026-09-20 21:15:40,588 - INFO - karaoke_builder - [Demucs] Command: /usr/local/bin/python -m demucs -n htdemucs -o /workspace/karaoke-builder/temp/test-job/demucs /workspace/karaoke-builder/test_data/input.mp3
+2026-09-20 21:15:40,588 - INFO - karaoke_builder - [Demucs] Executing... (timeout: 600s)
+2026-09-20 21:15:40,602 - ERROR - karaoke_builder - [Demucs_stderr] /usr/local/bin/python: No module named demucs.__main__; 'demucs' is a package and cannot be directly executed
+
+2026-09-20 21:15:40,602 - ERROR - karaoke_builder - [Demucs] Process exited with code 1
+2026-09-20 21:15:40,602 - ERROR - karaoke_builder - [Demucs] Demucs failed with exit code 1

@@ -1,9 +1,6 @@
-```
-# Compiled Python files
-*.pyc
+# Python bytecode
 __pycache__/
+*.pyc
 
-# Logs
-*.log
-karaoke-builder/logs/
-```
+# Editor tests (if considered temporary)
+.editor-tests/

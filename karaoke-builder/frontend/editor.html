@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Редактор таймингов — Karaoke Builder</title>
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/editor.css">
+</head>
+<body>
+    <div class="container editor-container">
+        <header class="editor-header">
+            <div class="editor-title-block">
+                <h1>✏️ Редактор таймингов</h1>
+                <div id="song-name" class="song-name">Песня: —</div>
+            </div>
+            <div class="editor-topbar-actions">
+                <button id="btn-load-json" class="btn btn-secondary">Загрузить karaoke.json</button>
+                <input type="file" id="json-input" accept=".json,application/json" hidden>
+                <button id="btn-load-audio" class="btn btn-secondary">Загрузить аудио</button>
+                <input type="file" id="audio-input" accept=".mp3,.wav,.m4a,.ogg,.flac,audio/*" hidden>
+                <button id="btn-save-json" class="btn btn-primary">Сохранить karaoke.json</button>
+                <a class="editor-back-link" href="/">← В pipeline</a>
+            </div>
+        </header>
+
+        <!-- Audio controls -->
+        <section class="card editor-player">
+            <div class="player-row">
+                <button id="btn-play" class="btn btn-primary player-btn" title="Play/Pause (Enter)">▶</button>
+                <button id="btn-seek-back" class="btn btn-secondary player-btn">−5 сек</button>
+                <button id="btn-seek-fwd" class="btn btn-secondary player-btn">+5 сек</button>
+                <span id="current-time" class="time-label big">00:00.00</span>
+                <input type="range" id="seek-bar" min="0" max="0" step="0.01" value="0" class="seek-bar">
+                <span id="total-duration" class="time-label big">00:00.00</span>
+            </div>
+            <div id="editor-message" class="editor-message"></div>
+        </section>
+
+        <!-- Sequential fixing -->
+        <section class="card editor-fix-panel">
+            <div class="fix-preview">
+                <div class="fix-preview-label">ТЕКУЩАЯ СТРОКА</div>
+                <div id="preview-current" class="preview-current">&lt;нет данных&gt;</div>
+                <div id="preview-next" class="preview-next"></div>
+            </div>
+            <div class="fix-actions">
+                <button id="btn-commit" class="btn commit-btn" title="Space">● Зафиксировать строку</button>
+                <button id="btn-undo" class="btn btn-secondary undo-btn" title="Отменить последнюю фиксацию">↶ Назад</button>
+                <div class="fix-hint">
+                    Space — зафиксировать границу следующей строки.<br>
+                    Enter — play/pause, ←/→ — перемотка на 0.1 сек.
+                </div>
+            </div>
+        </section>
+
+        <!-- Lines list -->
+        <section class="card editor-lines-card">
+            <h2>Строки (<span id="line-count">0</span>)</h2>
+            <div id="lines-list" class="lines-list">
+                <p class="empty-hint">Загрузите karaoke.json, чтобы начать редактирование.</p>
+            </div>
+        </section>
+    </div>
+
+    <audio id="audio-player" preload="auto"></audio>
+
+    <script src="js/editor.js"></script>
+</body>
+</html>

@@ -377,6 +377,12 @@ def api_get_karaoke_json():
     )
 
 
+@app.route('/editor')
+def serve_editor():
+    """Serve the standalone timing editor page"""
+    return send_from_directory(str(FRONTEND_DIR), 'editor.html')
+
+
 @app.route('/api/output/minus.mp3', methods=['GET'])
 def api_get_minus_mp3():
     """Get generated minus MP3"""

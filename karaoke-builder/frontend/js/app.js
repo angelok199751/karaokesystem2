@@ -35,6 +35,7 @@ class KaraokeBuilderApp {
             pipelineError: document.getElementById('pipeline-error'),
             pipelineActions: document.getElementById('pipeline-actions'),
             btnOpenPreview: document.getElementById('btn-open-preview'),
+            btnOpenEditor: document.getElementById('btn-open-editor'),
             btnRetry: document.getElementById('btn-retry'),
             
             debugConsole: window.debugConsole
@@ -266,6 +267,9 @@ class KaraokeBuilderApp {
         
         // Show preview button
         this.elements.btnOpenPreview.style.display = 'inline-block';
+        if (this.elements.btnOpenEditor) {
+            this.elements.btnOpenEditor.style.display = 'inline-block';
+        }
         this.elements.pipelineActions.style.display = 'block';
         
         this.elements.debugConsole.addLog({
@@ -325,6 +329,9 @@ class KaraokeBuilderApp {
                 // If this was the last stage, show preview button
                 if (this.failedStage === 'packaging') {
                     this.elements.btnOpenPreview.style.display = 'inline-block';
+                    if (this.elements.btnOpenEditor) {
+                        this.elements.btnOpenEditor.style.display = 'inline-block';
+                    }
                 }
             } else {
                 this.setStageStatus(this.failedStage, 'error', 'Failed again');

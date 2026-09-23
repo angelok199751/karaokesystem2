@@ -109,6 +109,7 @@ input[type="text"]:focus {
 
 /* Buttons */
 .btn {
+    display: inline-block;
     padding: 12px 24px;
     border: none;
     border-radius: 6px;
@@ -116,6 +117,23 @@ input[type="text"]:focus {
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
+    text-decoration: none;
+    color: inherit;
+    text-align: center;
+}
+
+.btn-success {
+    background: #2e7d32;
+    color: #fff;
+}
+
+.btn-success:hover:not(:disabled) {
+    background: #43a047;
+    transform: translateY(-2px);
+}
+
+.header-nav {
+    margin-top: 10px;
 }
 
 .btn-primary {
